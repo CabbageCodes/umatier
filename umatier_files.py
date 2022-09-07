@@ -102,10 +102,10 @@ for i in range(7):
 mystats = [10,0,4,0,0,2,-21]
 for i in range(7):
     training_stats_MANT[0][2][i] = mystats[i]
-mystats = [12,0,5,0,0,2,-23]
+mystats = [11,0,5,0,0,2,-23]
 for i in range(7):
     training_stats_MANT[0][3][i] = mystats[i]
-mystats = [13,0,6,0,0,2,-25]
+mystats = [12,0,6,0,0,2,-25]
 for i in range(7):
     training_stats_MANT[0][4][i] = mystats[i]
 
@@ -125,19 +125,19 @@ mystats = [0,11,0,5,0,2,-23]
 for i in range(7):
     training_stats_MANT[1][4][i] = mystats[i]
 
-mystats = [0,5,8,0,0,2,-18]
+mystats = [0,4,6,0,0,2,-18]
 for i in range(7):
     training_stats_MANT[2][0][i] = mystats[i]
-mystats = [0,5,9,0,0,2,-19]
+mystats = [0,4,7,0,0,2,-19]
 for i in range(7):
     training_stats_MANT[2][1][i] = mystats[i]
-mystats = [0,5,10,0,0,2,-20]
+mystats = [0,4,8,0,0,2,-20]
 for i in range(7):
     training_stats_MANT[2][2][i] = mystats[i]
-mystats = [0,6,11,0,0,2,-22]
+mystats = [0,5,9,0,0,2,-22]
 for i in range(7):
     training_stats_MANT[2][3][i] = mystats[i]
-mystats = [0,7,12,0,0,2,-24]
+mystats = [0,6,10,0,0,2,-24]
 for i in range(7):
     training_stats_MANT[2][4][i] = mystats[i]
 
@@ -175,3 +175,90 @@ for i in range(7):
 
 for j in range(5):
     training_stats_MANT[5][j][6] = 52.5
+
+
+
+training_stats_GL = [[[0 for i in range(7)] for j in range(5)] for k in range(6)]
+
+mystats = [8,0,4,0,0,3,-19]
+for i in range(7):
+    training_stats_GL[0][0][i] = mystats[i]
+mystats = [9,0,4,0,0,3,-20]
+for i in range(7):
+    training_stats_GL[0][1][i] = mystats[i]
+mystats = [10,0,4,0,0,3,-21]
+for i in range(7):
+    training_stats_GL[0][2][i] = mystats[i]
+mystats = [11,0,5,0,0,3,-23]
+for i in range(7):
+    training_stats_GL[0][3][i] = mystats[i]
+mystats = [12,0,6,0,0,3,-25]
+for i in range(7):
+    training_stats_GL[0][4][i] = mystats[i]
+
+mystats = [0,8,0,6,0,3,-20]
+for i in range(7):
+    training_stats_GL[1][0][i] = mystats[i]
+mystats = [0,9,0,6,0,3,-21]
+for i in range(7):
+    training_stats_GL[1][1][i] = mystats[i]
+mystats = [0,10,0,6,0,3,-22]
+for i in range(7):
+    training_stats_GL[1][2][i] = mystats[i]
+mystats = [0,11,0,7,0,3,-24]
+for i in range(7):
+    training_stats_GL[1][3][i] = mystats[i]
+mystats = [0,12,0,8,0,3,-26]
+for i in range(7):
+    training_stats_GL[1][4][i] = mystats[i]
+
+mystats = [0,4,9,0,0,3,-20]
+for i in range(7):
+    training_stats_GL[2][0][i] = mystats[i]
+mystats = [0,4,10,0,0,3,-21]
+for i in range(7):
+    training_stats_GL[2][1][i] = mystats[i]
+mystats = [0,4,11,0,0,3,-22]
+for i in range(7):
+    training_stats_GL[2][2][i] = mystats[i]
+mystats = [0,5,12,0,0,3,-24]
+for i in range(7):
+    training_stats_GL[2][3][i] = mystats[i]
+mystats = [0,6,13,0,0,3,-26]
+for i in range(7):
+    training_stats_GL[2][4][i] = mystats[i]
+
+mystats = [2,0,2,7,0,3,-20]
+for i in range(7):
+    training_stats_GL[3][0][i] = mystats[i]
+mystats = [2,0,2,8,0,3,-21]
+for i in range(7):
+    training_stats_GL[3][1][i] = mystats[i]
+mystats = [2,0,2,9,0,3,-22]
+for i in range(7):
+    training_stats_GL[3][2][i] = mystats[i]
+mystats = [3,0,2,10,0,3,-24]
+for i in range(7):
+    training_stats_GL[3][3][i] = mystats[i]
+mystats = [3,0,3,11,0,3,-26]
+for i in range(7):
+    training_stats_GL[3][4][i] = mystats[i]
+
+mystats = [2,0,0,0,6,5,5]
+for i in range(7):
+    training_stats_GL[4][0][i] = mystats[i]
+mystats = [2,0,0,0,7,5,5]
+for i in range(7):
+    training_stats_GL[4][1][i] = mystats[i]
+mystats = [2,0,0,0,8,6,5]
+for i in range(7):
+    training_stats_GL[4][2][i] = mystats[i]
+mystats = [3,0,0,0,9,6,5]
+for i in range(7):
+    training_stats_GL[4][3][i] = mystats[i]
+mystats = [4,0,0,0,10,6,5]
+for i in range(7):
+    training_stats_GL[4][4][i] = mystats[i]
+
+for j in range(5):
+    training_stats_GL[5][j][6] = 52.5

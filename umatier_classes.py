@@ -1,6 +1,6 @@
 import random
 import math
-from umatier_lin_programming import find_num_of_trainings, find_num_of_trainings_fast
+from umatier_lin_programming import find_num_of_trainings_fast
 
 
 class Uma:
@@ -25,11 +25,12 @@ class Card:
         self.hintrate = hintrate
         self.has_hint = 0
         self.has_rainbow = 0
-
+        self.scenario_link = 0
         self.chain = 0
-
+        self.bonus_value = 0
 
         self.rainbows_done_total = 0
+        self.trainings_done_with = 0
         self.rainbows_available_total = 0
         self.rainbows_done = 0
         self.training_statgain = 0
@@ -119,15 +120,18 @@ def give_training_values(training, cards, bondstat, training_stats, level, uma, 
     for mycard in cards:
         total_motiv += mycard.yaruki
         total_toreb += mycard.toreb
-        if bondstat > 80 and mycard.stype == training:
+        if (bondstat > 79 or (mycard.bond > 79 and bondstat == -1)) and mycard.stype == training:
             total_friendb = total_friendb * (1 + mycard.friendb / 100)
     result_stats = training_stats[training][level].copy()
+    # print(result_stats)
     for k in range(6):
         for mycard in cards:
             if result_stats[k] > 0:
                 result_stats[k] += mycard.statb[k]
     for k in range(6):
         result_stats[k] = result_stats[k] * (1 + 0.05 * len(cards)) * total_friendb * (1 + total_toreb / 100) * (1 + motivation * (1 + total_motiv / 100)) * (1 + uma.bonuses[k] / 100)
+    # print(result_stats)
+    for k in range(6):
         result_stats[k] = math.floor(result_stats[k])
     return result_stats
 
@@ -147,6 +151,11 @@ class Training_Environment:
         self.race_list = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2, 2, 2, 1, 2, 2, 2, 2, 3, 3, 2, 1, 2, 1, 2, 2, 3, 2, 3, 3, 3, 3, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 2, 3, 2, 2, 2, 2, 2, 3, 2, 3, 3, 2, 3, 3, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 2, 3, 0, 0, 0, 0, 0, 0, 0]
         self.race_statvals = [0, 5, 8, 10]
         self.race_spvals = [0, 35, 35, 45]
+        self.currency_val = 1
+        self.bond_scale = 7
+
+        self.calc_avg_vals = 0
+        self.avg_train_val = []
 
         self.turn_num = 0
         self.training_num = 0
@@ -154,14 +163,18 @@ class Training_Environment:
         self.maxenergy = 100
         self.is_summer = 0
         self.did_rainbow = 0
+        self.can_date = 0
+        self.npc_amount = 0
 
         self.statweights = statweights
 
         self.statweights_eval = statweights_eval
         self.statbonus_global = 1
-        self.statcap = 1200
+        self.statcap = [1200,1200,1200,1200,1200]
         self.global_friendb = 1
         self.global_tokui = 0
+
+        self.extra_statgain = [0,0,0,0,0,0]
 
         self.totaltrains = 1000
 
@@ -178,11 +191,13 @@ class Training_Environment:
         self.cutoff_trainings_done = 0
         self.score_cutoff = 0.5
         self.flat_cutoff = 0
+        self.total_currency = 0
+        self.currency_avg = 0
 
         self.training_amounts = [0, 0, 0, 0, 0, 0]
         self.optional_races_done = 0
         self.stats = [0, 0, 0, 0, 0, 0]
-
+        self.dates = []
         self.documentation_true = 0
 
         self.energy = 100
@@ -230,6 +245,8 @@ class Training_Environment:
             if card.stype == card.where and card.bond > 79 and card.stype < 5:
                 card.has_rainbow = 1
 
+            if card.name == "biwa":
+                card.toreb = 10 * (card.bond > 79)
             if card.name == "mati":
                 card.energyb = 5 + 5 * (card.bond > 99)
             if card.name == "nishino":
@@ -240,6 +257,9 @@ class Training_Environment:
             if card.name == "mrcb":
                 card.statb[5] = 1 * (card.bond > 79)
                 card.statb[4] = 1 + 1 * (card.bond > 79)
+            if card.name == "teio":
+                sumbond = sum([min(100,carda.bond) for carda in self.deck.cards])
+                card.toreb = 20*(sumbond/600)
             if card.name == "bamboo":
                 card.friendb = 20 + (100 - self.energy) / 100 * 17.5
             if card.name == "siri":
@@ -251,10 +271,41 @@ class Training_Environment:
                 card.toreb = 10*(card.bond > 79)
                 if 15 < self.turn_num < 21 or 29 < self.turn_num < 34:
                     card.has_rainbow = 1
-            if card.name == "rudoGrp":
+            if card.name == "throne":
                 card.statb[5] = 2*(card.bond > 79)
-                if 15 < self.turn_num < 21 or 29 < self.turn_num < 34:
+                if 15 < self.turn_num < 21 or 29 < self.turn_num < 33:
                     card.has_rainbow = 1
+                card.bond_value = 14
+                if card.bond > 55 and self.can_date == 0:
+                    self.can_date = 1
+                    card.bond_value = 2
+                    self.dates = [[0,0,0,0,36,0,13,5,0,card],
+                                  [24,0,0,0,0,0,13,5,1,card],
+                                  [0,0,0,0,0,18,39,5,0,card],
+                                  [12,0,0,0,30,18,26,5,0,card],
+                                  [18,0,0,0,36,24,26,5,1,card]]
+                if card.hintrate == 1 and random.random() < 0.3:
+                    card.has_rainbow = 1
+                card.hintrate = 0
+            if card.name == "hello":
+                card.bonus_value = 8
+                card.energy_discount = 0
+                for carda in self.deck.cards:
+                    if carda.stype < 5 and carda.where == card.where and carda.bond > 79:
+                        card.energy_discount = 30
+                card.bond_value = 10
+                if card.bond > 55 and self.can_date == 0:
+                    self.can_date = 1
+                    card.bond_value = 0
+                    self.dates = [[0,0,0,0,0,0,40,5,1,card],
+                                  [0,0,0,13,0,0,40,5,1,card],
+                                  [0,0,0,0,0,0,80,5,1,card],
+                                  [0,0,0,13,0,0,48,5,1,card],
+                                  [10,0,0,10,0,0,42,5,1,card]]
+            if card.name == "tachy":
+                card.friendb = 20 + 24 * (card.bond > 99)
+            if card.name == "bobos":
+                card.toreb = 10 * (card.bond > 79)
             if card.name == "maru":
                 if card.where >= 0:
                     training_level = min(math.floor(self.training_amounts[card.where] / 4),4)
@@ -268,6 +319,8 @@ class Training_Environment:
                     card.failrate_decrease = 100
                 else:
                     card.failrate_decrease = 0
+            if card.stype < 5:
+                card.bond_value = self.bond_scale * (1 + max(0,(80 - card.bond) / 320)) * (card.friendb / 30) * max(0,self.statweights[card.stype])
 
 
     def init_training(self):
@@ -343,6 +396,11 @@ class Training_Environment:
         self.is_summer = 0
         self.global_friendb = 1
         self.global_tokui = 0
+        self.total_currency = 0
+        self.extra_statgain = [0,0,0,0,0,0]
+        self.can_date = 0
+        self.dates = []
+        self.npc_amount = 0
 
     def init_batch(self):
         for card in self.deck.cards:
@@ -358,13 +416,23 @@ class Training_Environment:
         # self.avg_stat_per_turn = [0] * (self.turn_num + 1)
         self.cutoff_trainings_done = 0
         self.training_num = 0
+        self.currency_avg = 0
+
+        if self.calc_avg_vals == 1:
+            self.avg_train_val = [0]*70
 
     def set_documentation(self, documentation_true):
         self.documentation_true = documentation_true
 
     def take_turn(self):
         did_hint = 0
+        old_stats = self.stats.copy()
         self.did_rainbow = 0
+
+        if self.calc_avg_vals == 2:
+            self.statweights[6] = self.avg_train_val[self.turn_num+1]/72.5
+            # print(self.statweights)
+
         # do chain events:
         if self.turn_num in self.event_turns:
             chain_cards = [card for card in self.deck.cards if card.chain < len(card.chain_events)]
@@ -414,9 +482,9 @@ class Training_Environment:
             else:
                 mycard.has_hint = 0
             randomtraining = random.random()
-            if randomtraining < 0.05:
+            if randomtraining < 0.09:
                 mycard.where = -1
-            elif randomtraining < 0.05 + 0.19 * (1 + (mycard.tokui+self.global_tokui) / 100) and mycard.stype < 5:
+            elif randomtraining < 0.09 + (100 + mycard.tokui)*(1+self.global_tokui/100)/(550+mycard.tokui+self.global_tokui) and mycard.stype < 5:
                 mycard.where = mycard.stype
             else:
                 noconflict = 0
@@ -435,6 +503,8 @@ class Training_Environment:
             print(" ")
         # set training values to be used to choose the best training
         trainingvals = [0, 0, 0, 0, 0, 0]
+        # currency for GL
+        currencygain = [0, 0, 0, 0, 0, 0]
         # first we check how much each training gives in base stats
         if self.documentation_true and self.is_summer:
             print("it is summer this turn my dudes")
@@ -460,18 +530,13 @@ class Training_Environment:
             print(self.temp_trainstats[5][6])
         # give cards special effects
         self.set_deck_special()
-        # adjust bond values
-        for mycard in self.deck.cards:
-            if mycard.stype < 5:
-                mycard.bond_value = 7 * (1 + max(0,(80 - mycard.bond) / 320)) * (mycard.friendb / 30) * self.statweights[mycard.stype]
-            else:
-                mycard.bond_value = 6
         # calculate other values for all 5 trainings
         for i in range(5):
             temp_trainlist = []
             total_motiv = 0
             total_toreb = 0
             total_friendb = self.global_friendb
+            num_rainbow = 0
             total_energyb = 0
             total_hintsp = 0
             did_hint = 0
@@ -479,6 +544,7 @@ class Training_Environment:
             for mycard in self.deck.cards:
                 # check which cards are on the training and add their stats together, including rainbows
                 if mycard.where == i:
+                    trainingvals[i] += mycard.bonus_value
                     if mycard.has_hint == 1:
                         hint_nums += 1
                         if did_hint == 0:
@@ -488,6 +554,7 @@ class Training_Environment:
                     total_motiv += mycard.yaruki
                     total_toreb += mycard.toreb
                     if mycard.has_rainbow:
+                        num_rainbow += 1
                         total_friendb = total_friendb * (1 + mycard.friendb / 100)
                         mycard.rainbows_available_total += 1
                         if i == 4:
@@ -503,17 +570,45 @@ class Training_Environment:
                 for mycard in temp_trainlist:
                     if self.temp_trainstats[i][k] > 0:
                         self.temp_trainstats[i][k] += mycard.statb[k]
+            # add random GL npc bonus
             for k in range(6):
                 # calculate together training stat values and add them to the trainingvals list to evaluate which training is the best to do
-                self.temp_trainstats[i][k] = self.temp_trainstats[i][k] * (1 + 0.05 * len(temp_trainlist)) * total_friendb * (1 + total_toreb / 100) * (1 + self.motiv * (1 + total_motiv / 100)) * (1 + self.uma.bonuses[k] / 100)
+                self.temp_trainstats[i][k] = self.temp_trainstats[i][k] * (1 + 0.05 * len(temp_trainlist)) * (1 + total_toreb / 100)\
+                                             * (1 + self.motiv * (1 + total_motiv / 100)) * (1 + self.uma.bonuses[k] / 100)
+                if num_rainbow:
+                    self.temp_trainstats[i][k] = self.temp_trainstats[i][k] * total_friendb
                 self.temp_trainstats[i][k] = min(100, self.temp_trainstats[i][k]) * self.statbonus_global
-                self.temp_trainstats[i][k] = math.floor(self.temp_trainstats[i][k])
+                # add extra scenario specific statgain
+                if self.temp_trainstats[i][k] > 0:
+                    self.temp_trainstats[i][k] += self.extra_statgain[k]
                 # give small sp bonus for hints
                 if k == 5:
                     self.temp_trainstats[i][k] += total_hintsp
+                # add npc weird bonus stats in grand live
+                if self.scenario == "GL" and k == i:
+                    self.temp_trainstats[i][k] += self.npc_amount * 0.75 * random.random()/5
+                # adjust stat gain to half when over 1200
+                if k < 5:
+                    if self.stats[k] > 1199:
+                        self.temp_trainstats[i][k] = self.temp_trainstats[i][k] * 0.5
+                    elif self.stats[k] + self.temp_trainstats[i][k] > 1199:
+                        self.temp_trainstats[i][k] = (self.stats[k] + self.temp_trainstats[i][k] - 1200)*0.5 + (1200-self.stats[k])
                 # only give training stat a value if it is not capped
-                if self.stats[k] < self.statcap and k < 5:
-                    trainingvals[i] += min(self.temp_trainstats[i][k], self.statcap - self.stats[k]) * self.statweights[k]
+                self.temp_trainstats[i][k] = math.floor(self.temp_trainstats[i][k])
+
+                if k < 5 and self.stats[k] < self.statcap[k]:
+                    trainingvals[i] += min(self.temp_trainstats[i][k], self.statcap[k] - self.stats[k]) * self.statweights[k]
+                    # if i == 0 and k == 0 and self.energy == 100 and trainingvals[i] < 0:
+                    #     print("lolol", self.temp_trainstats[0], trainingvals[i], min(self.temp_trainstats[i][k], self.statcap[k] - self.stats[k]) * self.statweights[k])
+                if self.scenario == "GL":
+                    # add value of currency
+                    num_SL = sum([carda.scenario_link for carda in temp_trainlist])
+                    training_level = min(math.floor(self.training_amounts[i] / 4),4)
+                    if self.is_summer:
+                        training_level = 4
+                    currencygain[i] = math.floor((10+training_level+1.5*(random.random()*self.turn_num/15)+len(temp_trainlist)
+                                                  * 1.5-4*(i==4))*(1+(num_rainbow>0))*(1+0.2*num_SL))
+                    trainingvals[i] += currencygain[i]*self.currency_val
             # energy cost must be factored too
             if i < 4:
                 for mycard in temp_trainlist:
@@ -527,15 +622,24 @@ class Training_Environment:
             for mycard in temp_trainlist:
                 failrate *= (100 - mycard.failrate_decrease) / 100
             if failrate > 0:
-                trainingvals[i] *= (100 - 1.4 * failrate) / 100
+                trainingvals[i] *= max(0,(100 - 1.4 * failrate) / 100)
+                if failrate > 15:
+                    trainingvals[i] = 0
         # end turn by picking the best training and doing it
         maxval = max(trainingvals)
         maxindex = trainingvals.index(maxval)
+
+        if self.calc_avg_vals == 1:
+            max_norest = max(trainingvals[:4])
+            max_norest_index = trainingvals.index(maxval)
+            self.avg_train_val[self.turn_num] += max_norest - self.statweights[6]*self.temp_trainstats[max_norest_index][6]
+
 
         # check if we should do an optional race instead though
         random_racestat = random.randint(0, 4)
         racestat_increase = 2 * (self.race_list[self.turn_num + 6] == 3) + math.floor((1 + self.deck.total_racebonus / 100) * self.race_statvals[self.race_list[self.turn_num + 6]])
         racesp_increase = math.floor((1 + self.deck.total_racebonus / 100) * self.race_spvals[self.race_list[self.turn_num + 6]])
+
         current_race_value = racestat_increase + racesp_increase * self.statweights[5] - 15 * self.statweights[6]
         current_race_value *= 0.95
         for i in range(5):
@@ -544,7 +648,22 @@ class Training_Environment:
         self.temp_trainstats[6][6] = max(0, self.energy - 15) - self.energy
 
         #check what date could be done
-
+        maxdateval = 0
+        if len(self.dates) > 0:
+            maxdateindex = 0
+            for date in self.dates[:1]:
+                dateval = 0
+                for i in range(6):
+                    dateval += date[i]*self.statweights[i]
+                dateval += (min(self.maxenergy,self.energy + date[6]) - self.energy) * self.statweights[6]
+                dateval += date[7]/7*date[9].bond_value
+                if self.motiv < 0.2 and date[8] > 0:
+                    dateval += 10
+                if len(self.dates) > 3:
+                    dateval += 15
+                if dateval > maxdateval:
+                    maxdateval = dateval
+                    maxdateindex = self.dates.index(date)
 
         # document average stats from training per turn
         # if self.calc_avg_stat:
@@ -562,7 +681,12 @@ class Training_Environment:
         # if race is worse we train the best stat
         skipval = 0
         didskip = 0
-        if maxval > skipval and (current_race_value < maxval or self.consecutive_races == 2):
+
+        # if self.turn_num == 55:
+        #     print("speed: ", trainingvals[0], self.temp_trainstats[0], [card.name for card in self.deck.cards if card.where == 0])
+        #     print("max: ", trainingvals[maxindex], self.temp_trainstats[maxindex])
+        #     print("energy: ", self.energy)
+        if maxval >= skipval and (current_race_value <= maxval or self.consecutive_races == 2) and maxval >= maxdateval:
             self.consecutive_races = 0
             failrate = give_failrate(maxindex, min(math.floor(self.training_amounts[maxindex] / 4), 4), self.energy) / 100
             for mycard in self.deck.cards:
@@ -584,6 +708,7 @@ class Training_Environment:
             for mycard in self.deck.cards:
                 # give cards bond if they were on the training
                 if mycard.where == maxindex:
+                    mycard.trainings_done_with += 1
                     if mycard.has_rainbow:
                         mycard.rainbow_statgain += sum([self.temp_trainstats[maxindex][i] for i in range(5)])
                         mycard.rainbows_done += 1
@@ -599,17 +724,46 @@ class Training_Environment:
                         did_hint = 1
                     mycard.training_statgain += sum([self.temp_trainstats[maxindex][i] for i in range(5)])
                 # fix this please, extra stats for friend cards sometimes
-                    if mycard.stype == 5 and random.random() < 0.3:
-                        self.stats[4] += 4
-                        mycard.training_statgain += 4
+                    if mycard.stype == 5 and random.random() < 0.5:
+                        if mycard.name == "throne":
+                            self.stats[4] += 4
+                            if mycard.has_rainbow:
+                                self.stats[5] += 4
+                            mycard.training_statgain += 4
+                        elif mycard.name == "hello":
+                            self.stats[3] += 4
+                            self.stats[5] += 4
+                            self.total_currency += 20
+                            randomstat = random.randint(0,5)
+                            self.stats[randomstat] += 10 + 10*(randomstat == 5)
+                            self.total_currency += 20
+
                         mycard.bond += 5
                         if 79 < mycard.bond < 85:
                             mycard.turns_to_bond += self.turn_num + 1
+                    elif mycard.name == "throne":
+                        # fixxxxx
+                        mycard.hintrate = 1
 
             # change energy based on which training we did
             self.energy += self.temp_trainstats[maxindex][6]
             self.energy = min(self.energy, self.maxenergy)
             self.energy = max(self.energy, 0)
+
+            # GL currency stuff
+            if self.scenario == "GL" and maxindex < 5:
+                self.total_currency += currencygain[maxindex]
+                randomstat = random.randint(0,5 + len(self.deck.cards))
+                if randomstat > 5:
+                    randomstat = self.deck.cards[randomstat-6].stype
+                    if randomstat > 4:
+                        randomstat = random.randint(0,5)
+                mycurrency = currencygain[maxindex]
+
+                if self.energy < 75 and self.turn_num > 10 and random.random() < 0.3:
+                    self.energy += 25
+                    mycurrency = max(mycurrency - 20,0)
+                self.stats[randomstat] += math.floor(0.5*mycurrency*(1+randomstat==5))
 
             # documentation for what we have done so far
             self.training_amounts[maxindex] += 1
@@ -626,6 +780,18 @@ class Training_Environment:
                     self.stats[maxindex] += 5
                 if self.documentation_true:
                     print("got extra training random event, energy is now: ", self.energy)
+        elif current_race_value < maxdateval and maxdateval > skipval:
+            # print(self.dates[maxdateindex][:7],self.turn_num,self.energy)
+            # do date
+            for i in range(6):
+                self.stats[i] += self.dates[maxdateindex][i]
+            self.dates[maxdateindex][9].bond += self.dates[maxdateindex][7]
+            if self.motiv < 0.2 and self.dates[maxdateindex][8] > 0:
+                self.motiv += 0.1
+            self.energy = self.energy + self.dates[maxdateindex][6]
+            self.energy = min(self.energy,self.maxenergy)
+            self.energy = max(0,self.energy)
+            self.dates.pop(maxdateindex)
         elif current_race_value > maxval and current_race_value > skipval and self.consecutive_races < 2:
             # otherwise we do the race
             self.consecutive_races += 1
@@ -641,14 +807,22 @@ class Training_Environment:
                 print("we did race, current stats: ", self.stats)
                 print("current energy", self.energy)
         else:
-            if self.documentation_true:
-                print("we skipped the turn since it was bad")
+            # if self.documentation_true:
+            print("error: negative value training", self.energy, maxval, current_race_value, maxdateval)
             didskip = 1
         if self.documentation_true:
             print("*****************")
             print(" ")
         if didskip == 0:
             self.turn_num += 1
+        # print([card.bond*(card.bond < 79) for card in self.deck.cards], maxindex)
+
+        # half stat gain above 1200
+        for i in range(5):
+            if old_stats[i] > 1200:
+                self.stats[i] = math.floor((self.stats[i] + old_stats[i])/2)
+            elif self.stats[i] > 1200:
+                self.stats[i] = 1200 + math.floor((self.stats[i]-1200)*0.5)
 
     def do_training(self):
         self.init_training()
@@ -678,7 +852,7 @@ class Training_Environment:
         # print(self.stats)
         for i in range(6):
             if i < 5:
-                self.stats[i] = min(self.statcap, self.stats[i])
+                self.stats[i] = min(self.statcap[i], self.stats[i])
             addstats += math.floor(self.stats[i] * self.statweights_eval[i])
 
         if addstats > self.flat_cutoff:
@@ -753,7 +927,7 @@ class Training_Environment:
         addstats = 0
         for i in range(6):
             if i < 5:
-                self.stats[i] = min(self.statcap, self.stats[i])
+                self.stats[i] = min(self.statcap[i], self.stats[i])
             addstats += math.floor(self.stats[i] * self.statweights_eval[i])
 
         if addstats > self.flat_cutoff:
@@ -801,7 +975,7 @@ class Training_Environment:
         addstats = 0
         for i in range(6):
             if i < 5:
-                self.stats[i] = min(self.statcap, self.stats[i])
+                self.stats[i] = min(self.statcap[i], self.stats[i])
             addstats += math.floor(self.stats[i] * self.statweights_eval[i])
 
         if addstats > self.flat_cutoff:
@@ -819,33 +993,53 @@ class Training_Environment:
 
     def do_training_GL(self):
         self.init_training()
+        bonus_statgains = [3,0,3,0,3,3]
+        totalpick = 12
         total_max_motiv_turns = 0
-
         for i in range(self.total_turns):
-            self.global_friendb = 1+self.turn_num*0.6/75
-            self.global_tokui = self.turn_num*40/75
+            # if self.turn_num == 24:
+            #     print([[card.name,card.bond] for card in self.deck.cards])
+            #     print(self.training_amounts)
+            if self.turn_num == 4:
+                self.npc_amount = 1
+            elif self.turn_num == 20:
+                self.npc_amount = 5
+            elif self.turn_num == 30:
+                self.npc_amount = 7
+            elif self.turn_num == 52:
+                self.npc_amount = 9
+            elif self.turn_num == 60:
+                self.npc_amount = 11
+            if self.turn_num % 4 == 0 and totalpick > 0:
+                totalpick += -1
+                randomstat = random.choice([j for j,e in enumerate(bonus_statgains) if e > 0])
+                bonus_statgains[randomstat] += -1
+                self.extra_statgain[randomstat] += 1 + (randomstat == 5)
+            # self.consecutive_races = 2
+            if self.turn_num % 12 == 0:
+                self.global_friendb = 1+0.65*(self.total_currency/1500)**0.7
+                self.global_tokui = 40*(self.total_currency/1500)**0.7
+                self.statbonus_global = 1 + 0.05*(self.turn_num > 40) + 0.05*(self.turn_num > 56)
+            # if self.training_num == 2 and self.training_batch_num == 0:
+            #     print(self.global_friendb)
             if self.turn_num == 31 or self.turn_num == 52:
                 self.is_summer = 1
             elif self.turn_num == 35 or self.turn_num == 56:
                 self.is_summer = 0
             self.take_turn()
-            if self.turn_num > self.total_turns - self.senior_turns:
-                for i in range(5):
-                    for j in range(7):
-                        self.senior_statgain[i][j] += self.temp_trainstats[i][j]
-                for j in range(7):
-                    self.senior_statgain[5][j] += self.temp_trainstats[6][j]
             if self.motiv == 0.2:
                 total_max_motiv_turns += 1
-            vocalstats = 5 + 5*self.did_rainbow
-            randomstat = random.randint(0,4)
-            self.stats[randomstat] += vocalstats
         addstats = 0
+        # if self.training_num == 2:
+        #     print(self.global_tokui, self.global_friendb, self.extra_statgain, self.total_currency)
         # print(self.stats)
         for i in range(6):
             if i < 5:
-                self.stats[i] = min(self.statcap, self.stats[i])
-            addstats += math.floor(self.stats[i] * self.statweights_eval[i])
+                self.stats[i] = math.floor(min(self.statcap[i], self.stats[i]))
+            if self.stats[i] <= 1200 or i == 5:
+                addstats += self.stats[i]*self.statweights_eval[i]
+            else:
+                addstats += (2*(self.stats[i]-1200)+1200) * self.statweights_eval[i]
 
         if addstats > self.flat_cutoff:
             self.cutoff_trainings_done += 1
@@ -853,7 +1047,7 @@ class Training_Environment:
             for i in range(6):
                 self.avgstats[i] += self.stats[i]
             self.avg_optional_races += self.optional_races_done
-            self.score_list.append(addstats)
+            self.currency_avg += self.total_currency
         if addstats > self.beststatsval:
             for i in range(6):
                 self.beststats[i] = self.stats[i]
@@ -868,34 +1062,22 @@ class Training_Environment:
             print("")
 
     def do_batch(self, report, totaltrains):
-        self.senior_statgain = [[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]]
         self.totaltrains = totaltrains
         self.init_batch()
         for i in range(self.totaltrains):
             self.do_training()
-        self.score_list.sort()
-        for i in range(6):
-            for j in range(7):
-                self.senior_statgain[i][j] = math.floor(10 * self.senior_statgain[i][j] / self.senior_turns / self.totaltrains) / 10
         if report == 1:
             print("used deck: ", [mycard.name for mycard in self.deck.cards])
-            if self.flat_cutoff == 0:
-                print("did a total number of trainings equal to: ", self.cutoff_trainings_done)
-            else:
-                print("a total number of trainings equal to: ", self.cutoff_trainings_done, " out of ", self.totaltrains, " made the cutoff")
-                print("we only accepted trainings in the top ", self.score_cutoff * 100, "% of all trainings, with a flat score cutoff equal to: ", self.flat_cutoff)
+            print("did a total number of trainings equal to: ", self.cutoff_trainings_done)
             print("average rainbows done with each card: ", [math.floor(100 * card.rainbows_done_total / self.totaltrains) / 100 for card in self.deck.cards])
             print("average trainings done per category: ", [math.floor(100 * num / self.totaltrains) / 100 for num in self.average_trainings_done])
+
             print("average stat distribution: ", [math.floor(stat / self.cutoff_trainings_done) for stat in self.avgstats])
             print("average optional races done: ", math.floor(100 * self.avg_optional_races / self.cutoff_trainings_done) / 100)
             print("average total stats (weighted): ", math.floor(self.totalstats / self.cutoff_trainings_done))
             print("stats from the best run: ", self.beststats)
-            if self.flat_cutoff == 0:
-                print("score of percentile ", self.score_cutoff, " is equal to: ", self.score_list[math.floor(self.totaltrains * (1 - self.score_cutoff))])
             print("***********************")
             print("")
-        elif report == 2:
-            print("average total stats (weighted): ", math.floor(self.totalstats / self.cutoff_trainings_done))
         self.training_batch_num += 1
 
     def do_batch2(self, report, totaltrains, mandatory_stats, statweights_cutoff):
@@ -955,34 +1137,30 @@ class Training_Environment:
 
 
     def do_batch_GL(self, report, totaltrains):
-        self.senior_statgain = [[0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0], [0, 0, 0, 0, 0, 0, 0]]
+        for card in self.deck.cards:
+            if card.name in ["tach*","suzu","tachy","bourb","bobos","suzuf","hello","suzus"]:
+                card.scenario_link = 1
         self.totaltrains = totaltrains
         self.init_batch()
         for i in range(self.totaltrains):
             self.do_training_GL()
-        self.score_list.sort()
-        for i in range(6):
-            for j in range(7):
-                self.senior_statgain[i][j] = math.floor(10 * self.senior_statgain[i][j] / self.senior_turns / self.totaltrains) / 10
+            # experimental rb adjustment
+            if i % 2 == 0:
+                self.deck.cards[4].raceb = 10
+            else:
+                self.deck.cards[4].raceb = 5
         if report == 1:
             print("used deck: ", [mycard.name for mycard in self.deck.cards])
-            if self.flat_cutoff == 0:
-                print("did a total number of trainings equal to: ", self.cutoff_trainings_done)
-            else:
-                print("a total number of trainings equal to: ", self.cutoff_trainings_done, " out of ", self.totaltrains, " made the cutoff")
-                print("we only accepted trainings in the top ", self.score_cutoff * 100, "% of all trainings, with a flat score cutoff equal to: ", self.flat_cutoff)
+            print("did a total number of trainings equal to: ", self.cutoff_trainings_done)
             print("average rainbows done with each card: ", [math.floor(100 * card.rainbows_done_total / self.totaltrains) / 100 for card in self.deck.cards])
             print("average trainings done per category: ", [math.floor(100 * num / self.totaltrains) / 100 for num in self.average_trainings_done])
+            print("average currency gotten: ",math.floor(100 * self.currency_avg / self.cutoff_trainings_done) / 100)
             print("average stat distribution: ", [math.floor(stat / self.cutoff_trainings_done) for stat in self.avgstats])
             print("average optional races done: ", math.floor(100 * self.avg_optional_races / self.cutoff_trainings_done) / 100)
             print("average total stats (weighted): ", math.floor(self.totalstats / self.cutoff_trainings_done))
             print("stats from the best run: ", self.beststats)
-            if self.flat_cutoff == 0:
-                print("score of percentile ", self.score_cutoff, " is equal to: ", self.score_list[math.floor(self.totaltrains * (1 - self.score_cutoff))])
             print("***********************")
             print("")
-        elif report == 2:
-            print("average total stats (weighted): ", math.floor(self.totalstats / self.cutoff_trainings_done))
         self.training_batch_num += 1
 
 

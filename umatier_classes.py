@@ -154,6 +154,9 @@ class Training_Environment:
         self.currency_val = 1
         self.bond_scale = 7
 
+        self.stat_over_1200_val = 1
+        self.did_training = 0
+
         self.calc_avg_vals = 0
         self.avg_train_val = []
 
@@ -345,6 +348,9 @@ class Training_Environment:
                     self.total_racestats += math.floor(10 * (1 + self.deck.total_racebonus / 100))
                 self.stats[5] += math.floor(60 * (1 + self.deck.total_racebonus / 100))
                 self.stats[5] += 30
+            if self.scenario == "GL":
+                for i in range(5):
+                    self.stats[i] += 60
         elif self.scenario == "MANT":
             self.total_turns = 36
             for umaevents in range(15):
@@ -402,6 +408,7 @@ class Training_Environment:
         self.dates = []
         self.npc_amount = 0
 
+
     def init_batch(self):
         for card in self.deck.cards:
             card.reset_full()
@@ -426,6 +433,7 @@ class Training_Environment:
 
     def take_turn(self):
         did_hint = 0
+        self.did_training = 0
         old_stats = self.stats.copy()
         self.did_rainbow = 0
 
@@ -587,26 +595,41 @@ class Training_Environment:
                 # add npc weird bonus stats in grand live
                 if self.scenario == "GL" and k == i:
                     self.temp_trainstats[i][k] += self.npc_amount * 0.75 * random.random()/5
-                # adjust stat gain to half when over 1200
-                if k < 5:
-                    if self.stats[k] > 1199:
-                        self.temp_trainstats[i][k] = self.temp_trainstats[i][k] * 0.5
-                    elif self.stats[k] + self.temp_trainstats[i][k] > 1199:
-                        self.temp_trainstats[i][k] = (self.stats[k] + self.temp_trainstats[i][k] - 1200)*0.5 + (1200-self.stats[k])
+
+                # if k < 5:
+                #     if self.stats[k] > 1199:
+                #         self.temp_trainstats[i][k] = self.temp_trainstats[i][k] * 0.5
+                #     elif self.stats[k] + self.temp_trainstats[i][k] > 1199:
+                #         self.temp_trainstats[i][k] = (self.stats[k] + self.temp_trainstats[i][k] - 1200)*0.5 + (1200-self.stats[k])
+
                 # only give training stat a value if it is not capped
                 self.temp_trainstats[i][k] = math.floor(self.temp_trainstats[i][k])
 
                 if k < 5 and self.stats[k] < self.statcap[k]:
-                    trainingvals[i] += min(self.temp_trainstats[i][k], self.statcap[k] - self.stats[k]) * self.statweights[k]
-                    # if i == 0 and k == 0 and self.energy == 100 and trainingvals[i] < 0:
-                    #     print("lolol", self.temp_trainstats[0], trainingvals[i], min(self.temp_trainstats[i][k], self.statcap[k] - self.stats[k]) * self.statweights[k])
-                if self.scenario == "GL":
+                    overflowval = 0
+                    underflowval = 0
+                    if self.stats[k] > 1199:
+                        overflowval = math.floor(self.temp_trainstats[i][k] * 0.5)
+                    elif self.stats[k] + self.temp_trainstats[i][k] > 1199:
+                        overflowval = math.floor((self.stats[k] + self.temp_trainstats[i][k] - 1200)*0.5)
+                        underflowval = (1200-self.stats[k])
+                    else:
+                        underflowval = self.temp_trainstats[i][k]
+
+                    realgain = min(self.statcap[k]-self.stats[k],overflowval+underflowval)
+                    if realgain > underflowval:
+                        trainingvals[i] += ((realgain-underflowval)*self.stat_over_1200_val + underflowval) * self.statweights[k]
+                    else:
+                        trainingvals[i] += realgain * self.statweights[k]
+                    # if stat cap is somehow less than 1200 we have a problem above
+
+                if self.scenario == "GL" and self.turn_num > 4:
                     # add value of currency
                     num_SL = sum([carda.scenario_link for carda in temp_trainlist])
                     training_level = min(math.floor(self.training_amounts[i] / 4),4)
                     if self.is_summer:
                         training_level = 4
-                    currencygain[i] = math.floor((10+training_level+1.5*(random.random()*self.turn_num/15)+len(temp_trainlist)
+                    currencygain[i] = math.floor((10+training_level+1.5*(random.random()*self.turn_num/30)+len(temp_trainlist)
                                                   * 1.5-4*(i==4))*(1+(num_rainbow>0))*(1+0.2*num_SL))
                     trainingvals[i] += currencygain[i]*self.currency_val
             # energy cost must be factored too
@@ -760,7 +783,7 @@ class Training_Environment:
                         randomstat = random.randint(0,5)
                 mycurrency = currencygain[maxindex]
 
-                if self.energy < 75 and self.turn_num > 10 and random.random() < 0.3:
+                if self.energy < 75 and self.turn_num > 10 and random.random() < 0.25:
                     self.energy += 25
                     mycurrency = max(mycurrency - 20,0)
                 self.stats[randomstat] += math.floor(0.5*mycurrency*(1+randomstat==5))
@@ -769,6 +792,7 @@ class Training_Environment:
             self.training_amounts[maxindex] += 1
             self.average_trainings_done[maxindex] += 1
             self.last_training = maxindex
+            self.did_training = 1
             if self.documentation_true:
                 print("we did training: ", self.training_names[maxindex], " current stats: ", self.stats)
                 print("current energy", self.energy)
@@ -823,6 +847,11 @@ class Training_Environment:
                 self.stats[i] = math.floor((self.stats[i] + old_stats[i])/2)
             elif self.stats[i] > 1200:
                 self.stats[i] = 1200 + math.floor((self.stats[i]-1200)*0.5)
+
+        # if self.did_training:
+        #     print(self.stats[0], int(self.energy), maxindex, self.temp_trainstats[0][0])
+        # else:
+        #     print(self.stats[0], int(self.energy))
 
     def do_training(self):
         self.init_training()
@@ -993,7 +1022,8 @@ class Training_Environment:
 
     def do_training_GL(self):
         self.init_training()
-        bonus_statgains = [3,0,3,0,3,3]
+
+        bonus_statgains = [3,0,3,0,3,0]
         totalpick = 12
         total_max_motiv_turns = 0
         for i in range(self.total_turns):
@@ -1010,16 +1040,37 @@ class Training_Environment:
                 self.npc_amount = 9
             elif self.turn_num == 60:
                 self.npc_amount = 11
-            if self.turn_num % 4 == 0 and totalpick > 0:
+
+            # # add permanent bonus song stat gain effects
+            if self.turn_num in [22,30,31,40,41,50,51] and totalpick > 0:
                 totalpick += -1
                 randomstat = random.choice([j for j,e in enumerate(bonus_statgains) if e > 0])
                 bonus_statgains[randomstat] += -1
                 self.extra_statgain[randomstat] += 1 + (randomstat == 5)
+
             # self.consecutive_races = 2
-            if self.turn_num % 12 == 0:
-                self.global_friendb = 1+0.65*(self.total_currency/1500)**0.7
-                self.global_tokui = 40*(self.total_currency/1500)**0.7
-                self.statbonus_global = 1 + 0.05*(self.turn_num > 40) + 0.05*(self.turn_num > 56)
+
+            # if self.turn_num % 12 == 0:
+            #     self.global_friendb = 1+0.65*(self.total_currency/1500)**0.7
+            #     self.global_tokui = 40*(self.total_currency/1500)**0.7
+            #     self.statbonus_global = 1 + 0.05*(self.turn_num > 40) + 0.05*(self.turn_num > 56)
+
+            elif self.turn_num == 22:
+                self.global_friendb = 1.15
+            elif self.turn_num == 30:
+                self.global_tokui = 10
+                self.extra_statgain[5] += 2
+            elif self.turn_num == 41:
+                self.global_tokui = 20
+                self.extra_statgain[5] += 3
+            elif self.turn_num == 51:
+                self.global_friendb = 1.5
+                self.global_tokui = 25
+            elif self.turn_num == 62:
+                self.global_friendb = 1.65
+                self.global_tokui = 35
+
+                self.stats[5] += math.floor(self.total_currency/2)
             # if self.training_num == 2 and self.training_batch_num == 0:
             #     print(self.global_friendb)
             if self.turn_num == 31 or self.turn_num == 52:
@@ -1136,7 +1187,7 @@ class Training_Environment:
         self.training_batch_num += 1
 
 
-    def do_batch_GL(self, report, totaltrains):
+    def do_batch_GL(self, report, totaltrains, raceswap = 0):
         for card in self.deck.cards:
             if card.name in ["tach*","suzu","tachy","bourb","bobos","suzuf","hello","suzus"]:
                 card.scenario_link = 1
@@ -1145,10 +1196,11 @@ class Training_Environment:
         for i in range(self.totaltrains):
             self.do_training_GL()
             # experimental rb adjustment
-            if i % 2 == 0:
-                self.deck.cards[4].raceb = 10
-            else:
-                self.deck.cards[4].raceb = 5
+            if raceswap:
+                if i % 2 == 0:
+                    self.deck.cards[4].raceb = 10
+                else:
+                    self.deck.cards[4].raceb = 5
         if report == 1:
             print("used deck: ", [mycard.name for mycard in self.deck.cards])
             print("did a total number of trainings equal to: ", self.cutoff_trainings_done)

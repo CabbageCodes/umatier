@@ -237,5 +237,5 @@ festa.id = 30108
 maru.id = 30107
 suzu.id = 30002
 tachy.id = 30101
-hello.id = 30101
+hello.id = 30052
 teio.id = 30111
